@@ -1,0 +1,59 @@
+{
+  "info": {
+    "_postman_id": "b7a1d192-c7c1-40f6-b239-87aa4479ad75",
+    "name": "Express Auth API",
+    "description": "Runnable endpoint checks for the Express authentication starter. Start the API at localhost:3000 before running the collection.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "email", "value": "" },
+    { "key": "password", "value": "StrongPass123" },
+    { "key": "token", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health check",
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/health" },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('API responds successfully', () => pm.response.to.have.status(200));", "pm.test('Health status is ok', () => pm.expect(pm.response.json().status).to.eql('ok'));" ] } }]
+    },
+    {
+      "name": "Reject invalid registration",
+      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"A\",\n  \"email\": \"not-an-email\",\n  \"password\": \"weak\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/auth/register" },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Invalid input returns 400', () => pm.response.to.have.status(400));", "pm.test('Validation errors are returned', () => pm.expect(pm.response.json().errors).to.be.an('array').that.is.not.empty);" ] } }]
+    },
+    {
+      "name": "Register unique user",
+      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Postman User\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/auth/register" },
+      "event": [
+        { "listen": "prerequest", "script": { "type": "text/javascript", "exec": ["pm.collectionVariables.set('email', `postman-${Date.now()}@example.com`);"] } },
+        { "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('User is created', () => pm.response.to.have.status(201));", "pm.test('Public user data is returned without a password', () => { const body = pm.response.json(); pm.expect(body.user.email).to.eql(pm.collectionVariables.get('email')); pm.expect(body.user).not.to.have.property('passwordHash'); });" ] } }
+      ]
+    },
+    {
+      "name": "Reject duplicate registration",
+      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"name\": \"Postman User\",\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/auth/register" },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Duplicate email returns 409', () => pm.response.to.have.status(409));" ] } }]
+    },
+    {
+      "name": "Reject incorrect password",
+      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"WrongPassword123\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/auth/login" },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Incorrect credentials return 401', () => pm.response.to.have.status(401));" ] } }]
+    },
+    {
+      "name": "Login and save token",
+      "request": { "method": "POST", "header": [{ "key": "Content-Type", "value": "application/json" }], "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}", "options": { "raw": { "language": "json" } } }, "url": "{{baseUrl}}/api/auth/login" },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Login succeeds', () => pm.response.to.have.status(200));", "const body = pm.response.json();", "pm.test('A bearer token is returned', () => pm.expect(body.token).to.be.a('string').and.not.empty);", "pm.collectionVariables.set('token', body.token);"] } }]
+    },
+    {
+      "name": "Get current user with token",
+      "request": { "method": "GET", "header": [{ "key": "Authorization", "value": "Bearer {{token}}" }], "url": "{{baseUrl}}/api/auth/me" },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Authenticated profile returns 200', () => pm.response.to.have.status(200));", "pm.test('Profile matches registered account', () => pm.expect(pm.response.json().user.email).to.eql(pm.collectionVariables.get('email')));" ] } }]
+    },
+    {
+      "name": "Reject current user without token",
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/auth/me" },
+      "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["pm.test('Unauthenticated request returns 401', () => pm.response.to.have.status(401));" ] } }]
+    }
+  ]
+}
